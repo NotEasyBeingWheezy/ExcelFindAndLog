@@ -225,7 +225,7 @@ def process_excel_file(filepath, sheet_rules):
 
         print(f"  Found {len(wb.sheets)} sheets")
 
-        max_rows = CONFIG.get('max_rows_to_process', 1000)
+        max_rows = CONFIG.get('max_rows_to_process', 300)
 
         for sheet in wb.sheets:
             sheet_name = sheet.name
@@ -244,7 +244,7 @@ def process_excel_file(filepath, sheet_rules):
                     filename = os.path.basename(filepath)
                     for match in matches:
                         rule_name, sheet_n, first_val, second_val = match
-                        logging.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
+                        logging.info(f"[{rule_name}] Match - File: {filename}, Value 1: {first_val}, Value 2: {second_val}")
                     all_matches.extend(matches)
                 else:
                     print(f"      No matches found")
