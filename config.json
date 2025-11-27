@@ -1,5 +1,5 @@
 {
-  "max_rows_to_process": 1000,
+  "max_rows_to_process": 300,
   "folder_paths": {
     "windows": "C:\\Users\\FreddieHarris\\PriceTest",
     "mac": "/Users/yourname/Documents/ExcelFiles",
