@@ -1,0 +1,34 @@
+{
+  "max_rows_to_process": 1000,
+  "folder_paths": {
+    "windows": "C:\\Users\\FreddieHarris\\PriceTest",
+    "mac": "/Users/yourname/Documents/ExcelFiles",
+    "linux": "/path/to/excel/files"
+  },
+  "search_rules": [
+    {
+      "sheet_name": "Std Cricket Products Upload",
+      "search_column": "M",
+      "search_value": "NXT0015",
+      "check_column": "BK",
+      "check_value": "Black",
+      "enabled": true
+    },
+    {
+      "sheet_name": "Std Cricket Products Upload",
+      "search_column": "M",
+      "search_value": "NXT2277",
+      "check_column": "BK",
+      "check_value": "Black",
+      "enabled": true
+    }
+  ],
+  "notes": {
+    "description": "Configuration for Excel column search script",
+    "search_column": "The column to search for the first target value",
+    "search_value": "The value to find in the search_column",
+    "check_column": "The column to check when search_value is found",
+    "check_value": "The value to find in the check_column for a complete match",
+    "columns": "Use column letters like 'A', 'B', 'Z', 'AA', etc."
+  }
+}
