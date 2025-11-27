@@ -59,20 +59,41 @@ def load_configuration(config_path=None):
         sys.exit(1)
 
 def setup_logging():
-    """Set up logging to track matches"""
+    """Set up logging to track matches and errors"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f"search_results_{timestamp}.txt"
+    error_log_filename = f"errors_{timestamp}.txt"
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_filename, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
-    )
+    # Create main logger for results
+    logger = logging.getLogger('results')
+    logger.setLevel(logging.INFO)
 
-    return log_filename
+    # Create error logger
+    error_logger = logging.getLogger('errors')
+    error_logger.setLevel(logging.ERROR)
+
+    # Format for logs
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+
+    # Results log handlers
+    results_file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+    results_file_handler.setFormatter(formatter)
+    results_console_handler = logging.StreamHandler()
+    results_console_handler.setFormatter(formatter)
+
+    logger.addHandler(results_file_handler)
+    logger.addHandler(results_console_handler)
+
+    # Error log handlers
+    error_file_handler = logging.FileHandler(error_log_filename, encoding='utf-8')
+    error_file_handler.setFormatter(formatter)
+    error_console_handler = logging.StreamHandler()
+    error_console_handler.setFormatter(formatter)
+
+    error_logger.addHandler(error_file_handler)
+    error_logger.addHandler(error_console_handler)
+
+    return log_filename, error_log_filename
 
 def column_letter_to_index(col_letter):
     """Convert column letter(s) to zero-based index"""
@@ -174,13 +195,19 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
                                 ))
 
             except Exception as e:
-                print(f"      Warning: Error processing column pair {search_col}->{check_col}: {e}")
+                error_msg = f"Error processing column pair {search_col}->{check_col} in sheet {sheet_name}: {e}"
+                print(f"      Warning: {error_msg}")
+                error_logger = logging.getLogger('errors')
+                error_logger.error(error_msg)
                 continue
 
         return matches
 
     except Exception as e:
-        print(f"      Error searching sheet: {e}")
+        error_msg = f"Error searching sheet {sheet_name}: {e}"
+        print(f"      {error_msg}")
+        error_logger = logging.getLogger('errors')
+        error_logger.error(error_msg)
         return matches
 
 def process_excel_file(filepath, sheet_rules):
@@ -201,13 +228,21 @@ def process_excel_file(filepath, sheet_rules):
     wb = None
     all_matches = []
 
+    error_logger = logging.getLogger('errors')
+
     try:
         print(f"  Processing {os.path.basename(filepath)}")
 
         # Start Excel with performance optimizations
-        app = xw.App(visible=False, add_book=False)
-        app.display_alerts = False
-        app.screen_updating = False
+        try:
+            app = xw.App(visible=False, add_book=False)
+            app.display_alerts = False
+            app.screen_updating = False
+        except Exception as e:
+            error_msg = f"Failed to start Excel application for {os.path.basename(filepath)}: {e}"
+            print(f"  ERROR: {error_msg}")
+            error_logger.error(error_msg)
+            return all_matches
 
         # Disable calculation and events for speed
         calc_prev = None
@@ -217,11 +252,22 @@ def process_excel_file(filepath, sheet_rules):
             app.api.Calculation = -4135  # xlCalculationManual
             events_prev = app.api.EnableEvents
             app.api.EnableEvents = False
-        except Exception:
-            pass
+        except Exception as e:
+            error_logger.error(f"Failed to disable Excel calculations for {os.path.basename(filepath)}: {e}")
 
         # Open workbook
-        wb = app.books.open(filepath, update_links=False, notify=False, read_only=True)
+        try:
+            wb = app.books.open(filepath, update_links=False, notify=False, read_only=True)
+        except Exception as e:
+            error_msg = f"Failed to open workbook {os.path.basename(filepath)}: {e}"
+            print(f"  ERROR: {error_msg}")
+            error_logger.error(error_msg)
+            if app:
+                try:
+                    app.quit()
+                except:
+                    pass
+            return all_matches
 
         print(f"  Found {len(wb.sheets)} sheets")
 
@@ -242,9 +288,10 @@ def process_excel_file(filepath, sheet_rules):
                 if matches:
                     print(f"      Found {len(matches)} match(es)")
                     filename = os.path.basename(filepath)
+                    results_logger = logging.getLogger('results')
                     for match in matches:
                         rule_name, sheet_n, first_val, second_val = match
-                        logging.info(f"[{rule_name}] Match - File: {filename}, Value 1: {first_val}, Value 2: {second_val}")
+                        results_logger.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
                     all_matches.extend(matches)
                 else:
                     print(f"      No matches found")
@@ -257,21 +304,45 @@ def process_excel_file(filepath, sheet_rules):
                 app.api.Calculation = calc_prev
             if events_prev is not None:
                 app.api.EnableEvents = events_prev
-        except Exception:
-            pass
+        except Exception as e:
+            error_logger.error(f"Failed to restore Excel settings for {os.path.basename(filepath)}: {e}")
 
         return all_matches
 
     except Exception as e:
-        print(f"  ERROR: {str(e)}")
-        logging.error(f"Failed to process {os.path.basename(filepath)}: {e}")
+        error_msg = f"Failed to process {os.path.basename(filepath)}: {e}"
+        print(f"  ERROR: {error_msg}")
+        error_logger.error(error_msg)
         return all_matches
 
     finally:
+        # Close workbook with error handling
         if wb:
-            wb.close()
+            try:
+                wb.close()
+            except Exception as e:
+                error_msg = f"Failed to close workbook {os.path.basename(filepath)}: {e}"
+                print(f"  Warning: {error_msg}")
+                error_logger.error(error_msg)
+                # Try to force close if regular close fails
+                try:
+                    wb.api.Close(False)  # False = don't save changes
+                except:
+                    pass
+
+        # Quit Excel application with error handling
         if app:
-            app.quit()
+            try:
+                app.quit()
+            except Exception as e:
+                error_msg = f"Failed to quit Excel application after processing {os.path.basename(filepath)}: {e}"
+                print(f"  Warning: {error_msg}")
+                error_logger.error(error_msg)
+                # Try to force kill the Excel instance
+                try:
+                    app.api.Quit()
+                except:
+                    pass
 
 def main():
     """Main execution function"""
@@ -283,9 +354,11 @@ def main():
     print(f"Running on: {platform.system()} {platform.release()}")
 
     # Setup logging
-    log_file = setup_logging()
-    logging.info(f"Starting Excel column search operation")
+    log_file, error_log_file = setup_logging()
+    results_logger = logging.getLogger('results')
+    results_logger.info(f"Starting Excel column search operation")
     print(f"Results log: {log_file}")
+    print(f"Error log: {error_log_file}")
 
     # Get directory
     folder_paths = CONFIG.get('folder_paths', {})
@@ -386,6 +459,7 @@ def main():
     print(f"Total files processed: {len(excel_files)}")
     print(f"Total matches found: {total_matches}")
     print(f"\nResults saved to: {log_file}")
+    print(f"Errors logged to: {error_log_file}")
     print("="*60)
 
 if __name__ == "__main__":
