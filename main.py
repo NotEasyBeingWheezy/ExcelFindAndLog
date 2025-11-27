@@ -241,9 +241,10 @@ def process_excel_file(filepath, sheet_rules):
 
                 if matches:
                     print(f"      Found {len(matches)} match(es)")
+                    filename = os.path.basename(filepath)
                     for match in matches:
                         rule_name, sheet_n, first_val, second_val = match
-                        logging.info(f"[{rule_name}] Match - Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
+                        logging.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
                     all_matches.extend(matches)
                 else:
                     print(f"      No matches found")
