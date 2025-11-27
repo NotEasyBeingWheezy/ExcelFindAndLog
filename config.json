@@ -7,6 +7,7 @@
   },
   "search_rules": [
     {
+      "name": "NXT0015 Black Check",
       "sheet_name": "Std Cricket Products Upload",
       "search_column": "M",
       "search_value": "NXT0015",
@@ -15,6 +16,7 @@
       "enabled": true
     },
     {
+      "name": "NXT2277 Black Check",
       "sheet_name": "Std Cricket Products Upload",
       "search_column": "M",
       "search_value": "NXT2277",
@@ -24,11 +26,14 @@
     }
   ],
   "notes": {
-    "description": "Configuration for Excel column search script",
+    "description": "Configuration for Excel column search script - OPTIMIZED VERSION",
+    "name": "Optional: A descriptive name for the rule (for tracking in logs)",
     "search_column": "The column to search for the first target value",
     "search_value": "The value to find in the search_column",
     "check_column": "The column to check when search_value is found",
     "check_value": "The value to find in the check_column for a complete match",
-    "columns": "Use column letters like 'A', 'B', 'Z', 'AA', etc."
+    "enabled": "Set to false to disable a rule without deleting it",
+    "columns": "Use column letters like 'A', 'B', 'Z', 'AA', etc.",
+    "multiple_rules": "You can add unlimited rules. Rules with the same column pairs are processed together for speed."
   }
 }
