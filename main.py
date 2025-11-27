@@ -225,7 +225,7 @@ def process_excel_file(filepath, sheet_rules):
 
         print(f"  Found {len(wb.sheets)} sheets")
 
-        max_rows = CONFIG.get('max_rows_to_process', 1000)
+        max_rows = CONFIG.get('max_rows_to_process', 300)
 
         for sheet in wb.sheets:
             sheet_name = sheet.name
