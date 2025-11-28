@@ -7,21 +7,12 @@
   },
   "search_rules": [
     {
-      "name": "NXT0015 Black Check",
-      "sheet_name": "Std Cricket Products Upload",
-      "search_column": "M",
-      "search_value": "NXT0015",
-      "check_column": "BK",
-      "check_value": "Black",
-      "enabled": true
-    },
-    {
-      "name": "NXT2277 Black Check",
+      "name": "NXT2277 Emerald Green Check",
       "sheet_name": "Std Cricket Products Upload",
       "search_column": "M",
       "search_value": "NXT2277",
       "check_column": "BK",
-      "check_value": "Black",
+      "check_value": "Green",
       "enabled": true
     }
   ],
