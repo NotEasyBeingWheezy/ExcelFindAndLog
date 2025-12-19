@@ -1,16 +1,16 @@
 {
   "max_rows_to_process": 300,
   "folder_paths": {
-    "windows": "C:\\Users\\FreddieHarris\\PriceTest",
+    "windows": "C:\\Users\\FreddieHarris\\AllSpreadsheets",
     "mac": "/Users/yourname/Documents/ExcelFiles",
     "linux": "/path/to/excel/files"
   },
   "search_rules": [
     {
-      "name": "NXT2277 Emerald Green Check",
+      "name": "1KBP0059 Green Playing Trouser Log",
       "sheet_name": "Std Cricket Products Upload",
       "search_column": "M",
-      "search_value": "NXT2277",
+      "search_value": "1KBP0059",
       "check_column": "BK",
       "check_value": "Green",
       "enabled": true
