@@ -22,6 +22,7 @@ import platform
 from datetime import datetime
 import logging
 import json
+import csv
 
 try:
     import xlwings as xw
@@ -63,6 +64,7 @@ def setup_logging():
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f"search_results_{timestamp}.txt"
     error_log_filename = f"errors_{timestamp}.txt"
+    csv_filename = f"search_results_{timestamp}.csv"
 
     # Create main logger for results
     logger = logging.getLogger('results')
@@ -93,7 +95,7 @@ def setup_logging():
     error_logger.addHandler(error_file_handler)
     error_logger.addHandler(error_console_handler)
 
-    return log_filename, error_log_filename
+    return log_filename, error_log_filename, csv_filename
 
 def column_letter_to_index(col_letter):
     """Convert column letter(s) to zero-based index"""
@@ -361,11 +363,12 @@ def main():
     print(f"Running on: {platform.system()} {platform.release()}")
 
     # Setup logging
-    log_file, error_log_file = setup_logging()
+    log_file, error_log_file, csv_file = setup_logging()
     results_logger = logging.getLogger('results')
     results_logger.info(f"Starting Excel column search operation")
     print(f"Results log: {log_file}")
     print(f"Error log: {error_log_file}")
+    print(f"CSV output: {csv_file}")
 
     # Get directory
     folder_paths = CONFIG.get('folder_paths', {})
@@ -451,6 +454,7 @@ def main():
 
     # Process files with reused Excel instance for performance
     total_matches = 0
+    all_matches = []  # Collect all matches for CSV export
     os.chdir(directory)
 
     # Create Excel instance once and reuse for all files (major performance boost)
@@ -477,6 +481,7 @@ def main():
             print(f"\nFile {i}/{len(excel_files)}: {filename}")
 
             matches = process_excel_file(filepath, sheet_rules, app)
+            all_matches.extend([(os.path.basename(filepath),) + match for match in matches])
             total_matches += len(matches)
 
     except Exception as e:
@@ -490,6 +495,7 @@ def main():
             filepath = os.path.join(directory, filename)
             print(f"\nFile {i}/{len(excel_files)}: {filename}")
             matches = process_excel_file(filepath, sheet_rules)
+            all_matches.extend([(os.path.basename(filepath),) + match for match in matches])
             total_matches += len(matches)
 
     finally:
@@ -505,12 +511,41 @@ def main():
                 except:
                     pass
 
+    # Write results to CSV
+    if all_matches:
+        try:
+            print("\nWriting results to CSV...")
+            with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                # CSV header for two-column search
+                fieldnames = ['File', 'Rule Name', 'Sheet', 'Search Value', 'Check Value']
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+
+                # Write each match
+                for match in all_matches:
+                    # match format: (filename, rule_name, sheet_name, search_value, check_value)
+                    filename, rule_name, sheet_name, search_value, check_value = match
+                    row = {
+                        'File': filename,
+                        'Rule Name': rule_name,
+                        'Sheet': sheet_name,
+                        'Search Value': search_value,
+                        'Check Value': check_value
+                    }
+                    writer.writerow(row)
+
+            print(f"CSV written successfully: {csv_file}")
+        except Exception as e:
+            error_logger.error(f"Failed to write CSV file: {e}")
+            print(f"Warning: Failed to write CSV file: {e}")
+
     # Summary
     print("\n" + "="*60)
     print("SEARCH COMPLETE!")
     print(f"Total files processed: {len(excel_files)}")
     print(f"Total matches found: {total_matches}")
     print(f"\nResults saved to: {log_file}")
+    print(f"CSV output saved to: {csv_file}")
     print(f"Errors logged to: {error_log_file}")
     print("="*60)
 
