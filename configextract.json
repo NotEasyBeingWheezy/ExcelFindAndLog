@@ -1,7 +1,7 @@
 {
   "max_rows_to_process": 300,
   "folder_paths": {
-    "windows": "C:\\Users\\FreddieHarris\\PriceTest",
+    "windows": "C:\\Users\\FreddieHarris\\AllSpreadsheets",
     "mac": "/Users/yourname/Documents/ExcelFiles",
     "linux": "/path/to/excel/files"
   },
