@@ -1,0 +1,34 @@
+{
+  "max_rows_to_process": 300,
+  "folder_paths": {
+    "windows": "C:\\Users\\FreddieHarris\\PriceTest",
+    "mac": "/Users/yourname/Documents/ExcelFiles",
+    "linux": "/path/to/excel/files"
+  },
+  "search_rules": [
+    {
+      "name": "Find 1KBP0059 and log A, B, C",
+      "sheet_name": "Std Cricket Products Upload",
+      "search_column": "M",
+      "search_value": "1KBP0059",
+      "log_columns": ["A", "B", "C"],
+      "enabled": true
+    },
+    {
+      "name": "Find NXT2277 and log A, B, C",
+      "sheet_name": "Std Cricket Products Upload",
+      "search_column": "M",
+      "search_value": "NXT2277",
+      "log_columns": ["A", "B", "C"],
+      "enabled": true
+    }
+  ],
+  "notes": {
+    "description": "Configuration for single-column Excel search script",
+    "name": "Optional: A descriptive name for the rule (for tracking in logs)",
+    "search_column": "The column to search for the target value (e.g., 'M', 'A', 'BK')",
+    "search_value": "The value to find in the search_column",
+    "log_columns": "Array of column letters to log when match is found (e.g., ['A', 'B', 'C'])",
+    "enabled": "Set to false to disable a rule without deleting it"
+  }
+}
