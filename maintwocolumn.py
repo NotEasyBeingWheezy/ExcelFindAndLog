@@ -40,7 +40,7 @@ def load_configuration(config_path=None):
 
     if config_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(script_dir, "config.json")
+        config_path = os.path.join(script_dir, "configtwocolumn.json")
 
     if not os.path.exists(config_path):
         print(f"ERROR: Configuration file not found: {config_path}")
