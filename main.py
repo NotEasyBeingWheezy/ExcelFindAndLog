@@ -122,6 +122,7 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
     """
     matches = []
     sheet_name = sheet.name
+    error_logger = logging.getLogger('errors')  # Cache logger reference
 
     try:
         # Get used range
@@ -197,7 +198,6 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
             except Exception as e:
                 error_msg = f"Error processing column pair {search_col}->{check_col} in sheet {sheet_name}: {e}"
                 print(f"      Warning: {error_msg}")
-                error_logger = logging.getLogger('errors')
                 error_logger.error(error_msg)
                 continue
 
@@ -206,13 +206,17 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
     except Exception as e:
         error_msg = f"Error searching sheet {sheet_name}: {e}"
         print(f"      {error_msg}")
-        error_logger = logging.getLogger('errors')
         error_logger.error(error_msg)
         return matches
 
-def process_excel_file(filepath, sheet_rules):
+def process_excel_file(filepath, sheet_rules, app=None):
     """
     OPTIMIZED: Process Excel file with search rules
+
+    Args:
+        filepath: Path to the Excel file
+        sheet_rules: Dictionary of sheet rules
+        app: Optional xlwings App instance (for reusing across files)
 
     sheet_rules format:
     {
@@ -224,25 +228,29 @@ def process_excel_file(filepath, sheet_rules):
         }
     }
     """
-    app = None
     wb = None
     all_matches = []
+    app_created = False  # Track if we created the app instance
 
+    # Cache logger references
     error_logger = logging.getLogger('errors')
+    results_logger = logging.getLogger('results')
 
     try:
         print(f"  Processing {os.path.basename(filepath)}")
 
-        # Start Excel with performance optimizations
-        try:
-            app = xw.App(visible=False, add_book=False)
-            app.display_alerts = False
-            app.screen_updating = False
-        except Exception as e:
-            error_msg = f"Failed to start Excel application for {os.path.basename(filepath)}: {e}"
-            print(f"  ERROR: {error_msg}")
-            error_logger.error(error_msg)
-            return all_matches
+        # Start Excel with performance optimizations (if not provided)
+        if app is None:
+            try:
+                app = xw.App(visible=False, add_book=False)
+                app.display_alerts = False
+                app.screen_updating = False
+                app_created = True
+            except Exception as e:
+                error_msg = f"Failed to start Excel application for {os.path.basename(filepath)}: {e}"
+                print(f"  ERROR: {error_msg}")
+                error_logger.error(error_msg)
+                return all_matches
 
         # Disable calculation and events for speed
         calc_prev = None
@@ -275,28 +283,27 @@ def process_excel_file(filepath, sheet_rules):
 
         for sheet in wb.sheets:
             sheet_name = sheet.name
+
+            # Skip sheets without rules early (performance optimization)
+            if sheet_name not in sheet_rules:
+                continue
+
             print(f"    Checking sheet: {sheet_name}")
+            rules_by_column_pair = sheet_rules[sheet_name]
+            total_rules = sum(len(rules) for rules in rules_by_column_pair.values())
+            print(f"      Found {total_rules} rule(s) in {len(rules_by_column_pair)} column pair(s)")
 
-            # Check if we have rules for this sheet
-            if sheet_name in sheet_rules:
-                rules_by_column_pair = sheet_rules[sheet_name]
-                total_rules = sum(len(rules) for rules in rules_by_column_pair.values())
-                print(f"      Found {total_rules} rule(s) in {len(rules_by_column_pair)} column pair(s)")
+            matches = search_sheet_optimized(sheet, rules_by_column_pair, max_rows)
 
-                matches = search_sheet_optimized(sheet, rules_by_column_pair, max_rows)
-
-                if matches:
-                    print(f"      Found {len(matches)} match(es)")
-                    filename = os.path.basename(filepath)
-                    results_logger = logging.getLogger('results')
-                    for match in matches:
-                        rule_name, sheet_n, first_val, second_val = match
-                        results_logger.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
-                    all_matches.extend(matches)
-                else:
-                    print(f"      No matches found")
+            if matches:
+                print(f"      Found {len(matches)} match(es)")
+                filename = os.path.basename(filepath)
+                for match in matches:
+                    rule_name, sheet_n, first_val, second_val = match
+                    results_logger.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
+                all_matches.extend(matches)
             else:
-                print(f"      Skipping (no rules for this sheet)")
+                print(f"      No matches found")
 
         # Restore Excel settings
         try:
@@ -330,8 +337,8 @@ def process_excel_file(filepath, sheet_rules):
                 except:
                     pass
 
-        # Quit Excel application with error handling
-        if app:
+        # Quit Excel application only if we created it (not if it was passed in)
+        if app and app_created:
             try:
                 app.quit()
             except Exception as e:
@@ -442,16 +449,61 @@ def main():
             for rule in rules:
                 print(f"      - {rule['rule_name']}: '{rule['search_value']}' -> '{rule['check_value']}'")
 
-    # Process files
+    # Process files with reused Excel instance for performance
     total_matches = 0
     os.chdir(directory)
 
-    for i, filename in enumerate(excel_files, 1):
-        filepath = os.path.join(directory, filename)
-        print(f"\nFile {i}/{len(excel_files)}: {filename}")
+    # Create Excel instance once and reuse for all files (major performance boost)
+    app = None
+    error_logger = logging.getLogger('errors')
 
-        matches = process_excel_file(filepath, sheet_rules)
-        total_matches += len(matches)
+    try:
+        print("\nStarting Excel application...")
+        app = xw.App(visible=False, add_book=False)
+        app.display_alerts = False
+        app.screen_updating = False
+
+        # Disable calculation and events for speed
+        try:
+            app.api.Calculation = -4135  # xlCalculationManual
+            app.api.EnableEvents = False
+        except Exception as e:
+            error_logger.error(f"Failed to disable Excel calculations: {e}")
+
+        print("Excel ready. Processing files...\n")
+
+        for i, filename in enumerate(excel_files, 1):
+            filepath = os.path.join(directory, filename)
+            print(f"\nFile {i}/{len(excel_files)}: {filename}")
+
+            matches = process_excel_file(filepath, sheet_rules, app)
+            total_matches += len(matches)
+
+    except Exception as e:
+        error_msg = f"Failed to initialize Excel application: {e}"
+        print(f"ERROR: {error_msg}")
+        error_logger.error(error_msg)
+        print("Falling back to processing files without shared Excel instance...")
+
+        # Fallback: process files without shared instance
+        for i, filename in enumerate(excel_files, 1):
+            filepath = os.path.join(directory, filename)
+            print(f"\nFile {i}/{len(excel_files)}: {filename}")
+            matches = process_excel_file(filepath, sheet_rules)
+            total_matches += len(matches)
+
+    finally:
+        # Close shared Excel instance
+        if app:
+            print("\nClosing Excel application...")
+            try:
+                app.quit()
+            except Exception as e:
+                error_logger.error(f"Failed to quit Excel application: {e}")
+                try:
+                    app.api.Quit()
+                except:
+                    pass
 
     # Summary
     print("\n" + "="*60)
