@@ -132,7 +132,7 @@ def search_sheet_optimized(sheet, rules_by_search_column, max_rows):
         if used_range is None:
             return matches
 
-        rows, cols = used_range.shape
+        rows, _ = used_range.shape
         rows_to_process = min(rows, max_rows)
 
         print(f"      Processing {rows_to_process} rows with {len(rules_by_search_column)} search column(s)")
@@ -285,7 +285,7 @@ def process_excel_file(filepath, sheet_rules, app=None):
             if app and app_created:
                 try:
                     app.quit()
-                except:
+                except Exception:
                     pass
             return all_matches
 
@@ -317,7 +317,7 @@ def process_excel_file(filepath, sheet_rules, app=None):
                     results_logger.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Search Value: {search_val}, {columns_str}")
                 all_matches.extend(matches)
             else:
-                print(f"      No matches found")
+                print("      No matches found")
 
         # Restore Excel settings
         try:
@@ -348,7 +348,7 @@ def process_excel_file(filepath, sheet_rules, app=None):
                 # Try to force close if regular close fails
                 try:
                     wb.api.Close(False)  # False = don't save changes
-                except:
+                except Exception:
                     pass
 
         # Quit Excel application only if we created it (not if it was passed in)
@@ -362,7 +362,7 @@ def process_excel_file(filepath, sheet_rules, app=None):
                 # Try to force kill the Excel instance
                 try:
                     app.api.Quit()
-                except:
+                except Exception:
                     pass
 
 def main():
@@ -377,7 +377,7 @@ def main():
     # Setup logging
     log_file, error_log_file = setup_logging()
     results_logger = logging.getLogger('results')
-    results_logger.info(f"Starting Excel column search operation")
+    results_logger.info("Starting Excel column search operation")
     print(f"Results log: {log_file}")
     print(f"Error log: {error_log_file}")
 
@@ -515,7 +515,7 @@ def main():
                 error_logger.error(f"Failed to quit Excel application: {e}")
                 try:
                     app.api.Quit()
-                except:
+                except Exception:
                     pass
 
     # Summary
