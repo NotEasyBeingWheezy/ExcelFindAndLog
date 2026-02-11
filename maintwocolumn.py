@@ -112,13 +112,13 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
     rules_by_column_pair format:
     {
         ('A', 'B'): [
-            {'rule_name': 'Rule 1', 'search_value': 'val1', 'check_value': 'val2'},
-            {'rule_name': 'Rule 2', 'search_value': 'val3', 'check_value': 'val4'}
+            {'rule_name': 'Rule 1', 'search_value': 'val1', 'check_value': 'val2', 'log_columns': ['C', 'D']},
+            {'rule_name': 'Rule 2', 'search_value': 'val3', 'check_value': 'val4', 'log_columns': []}
         ]
     }
 
     Returns list of matches with format:
-    [(rule_name, sheet_name, first_column_value, second_column_value), ...]
+    [(rule_name, sheet_name, first_column_value, second_column_value, {col: value, ...}), ...]
     """
     matches = []
     sheet_name = sheet.name
@@ -142,6 +142,11 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
                 search_col_idx = column_letter_to_index(search_col)
                 check_col_idx = column_letter_to_index(check_col)
 
+                # Collect all unique log columns needed for this column pair
+                all_log_columns = set()
+                for rule in rule_group:
+                    all_log_columns.update(rule.get('log_columns', []))
+
                 # OPTIMIZATION: Read entire columns at once
                 search_range = sheet.range((1, search_col_idx + 1), (rows_to_process, search_col_idx + 1))
                 check_range = sheet.range((1, check_col_idx + 1), (rows_to_process, check_col_idx + 1))
@@ -156,8 +161,18 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
                 if not isinstance(check_values, list):
                     check_values = [check_values]
 
+                # Read all log columns at once
+                log_column_data = {}
+                for log_col in all_log_columns:
+                    log_col_idx = column_letter_to_index(log_col)
+                    log_range = sheet.range((1, log_col_idx + 1), (rows_to_process, log_col_idx + 1))
+                    log_values = log_range.value
+                    if not isinstance(log_values, list):
+                        log_values = [log_values]
+                    log_column_data[log_col] = log_values
+
                 # Build lookup dictionary for all rules in this column pair
-                # Format: {normalized_search_value: [(rule_name, check_value), ...]}
+                # Format: {normalized_search_value: [(rule_name, check_value, log_columns), ...]}
                 search_lookup = {}
                 for rule in rule_group:
                     search_val_normalized = str(rule['search_value']).strip().lower()
@@ -165,7 +180,8 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
                         search_lookup[search_val_normalized] = []
                     search_lookup[search_val_normalized].append({
                         'rule_name': rule['rule_name'],
-                        'check_value': str(rule['check_value']).strip().lower()
+                        'check_value': str(rule['check_value']).strip().lower(),
+                        'log_columns': rule.get('log_columns', [])
                     })
 
                 # SINGLE PASS through rows for this column pair
@@ -187,12 +203,19 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
                         # Check all rules for this search value
                         for rule_info in search_lookup[search_val_normalized]:
                             if check_val_normalized == rule_info['check_value']:
+                                # Get values from log columns
+                                logged_values = {}
+                                for log_col in rule_info['log_columns']:
+                                    col_val = log_column_data[log_col][row_idx]
+                                    logged_values[log_col] = str(col_val).strip() if col_val else ""
+
                                 # Match found!
                                 matches.append((
                                     rule_info['rule_name'],
                                     sheet_name,
                                     search_val_str,
-                                    check_val_str
+                                    check_val_str,
+                                    logged_values
                                 ))
 
             except Exception as e:
@@ -299,8 +322,12 @@ def process_excel_file(filepath, sheet_rules, app=None):
                 print(f"      Found {len(matches)} match(es)")
                 filename = os.path.basename(filepath)
                 for match in matches:
-                    rule_name, sheet_n, first_val, second_val = match
-                    results_logger.info(f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}")
+                    rule_name, sheet_n, first_val, second_val, logged_values = match
+                    log_msg = f"[{rule_name}] Match - File: {filename}, Sheet: {sheet_n}, Value 1: {first_val}, Value 2: {second_val}"
+                    if logged_values:
+                        columns_str = ", ".join([f"{col}: {val}" for col, val in logged_values.items()])
+                        log_msg += f", {columns_str}"
+                    results_logger.info(log_msg)
                 all_matches.extend(matches)
             else:
                 print(f"      No matches found")
@@ -428,11 +455,14 @@ def main():
         if col_pair not in sheet_rules[sheet_name]:
             sheet_rules[sheet_name][col_pair] = []
 
+        log_columns = rule.get('log_columns', [])
+
         # Add rule to group
         sheet_rules[sheet_name][col_pair].append({
             'rule_name': rule_name,
             'search_value': search_val,
-            'check_value': check_val
+            'check_value': check_val,
+            'log_columns': log_columns
         })
         rule_count += 1
 
@@ -447,7 +477,10 @@ def main():
         for (search_col, check_col), rules in rules_by_col_pair.items():
             print(f"    Column pair {search_col}->{check_col}: {len(rules)} rule(s)")
             for rule in rules:
-                print(f"      - {rule['rule_name']}: '{rule['search_value']}' -> '{rule['check_value']}'")
+                log_info = ""
+                if rule.get('log_columns'):
+                    log_info = f" → also log [{', '.join(rule['log_columns'])}]"
+                print(f"      - {rule['rule_name']}: '{rule['search_value']}' -> '{rule['check_value']}'{log_info}")
 
     # Process files with reused Excel instance for performance
     total_matches = 0
