@@ -105,20 +105,22 @@ def column_letter_to_index(col_letter):
 
 def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
     """
-    OPTIMIZED: Search a sheet for matching values using batch column reads
-
-    Processes multiple rules grouped by column pairs in a single pass
-
-    rules_by_column_pair format:
-    {
-        ('A', 'B'): [
-            {'rule_name': 'Rule 1', 'search_value': 'val1', 'check_value': 'val2', 'log_columns': ['C', 'D']},
-            {'rule_name': 'Rule 2', 'search_value': 'val3', 'check_value': 'val4', 'log_columns': []}
-        ]
-    }
-
-    Returns list of matches with format:
-    [(rule_name, sheet_name, first_column_value, second_column_value, {col: value, ...}), ...]
+    Search a worksheet for rule matches by reading columns in bulk and evaluating grouped rules per column pair.
+    
+    Parameters:
+        sheet (xlwings.Sheet): Sheet to search.
+        rules_by_column_pair (dict): Mapping of (search_col, check_col) tuples (Excel column letters) to lists of rule dicts.
+            Each rule dict must include:
+                - 'rule_name' (str): Name to attribute to a match.
+                - 'search_value' (str): Value to find in the search column.
+                - 'check_value' (str): Value required in the check column for a match.
+                - 'log_columns' (list[str]): Excel column letters whose values should be captured when the rule matches.
+        max_rows (int): Maximum number of rows to process from the sheet (caps the used range).
+    
+    Returns:
+        list: A list of match tuples with the shape:
+            (rule_name, sheet_name, first_column_value, second_column_value, logged_values)
+        where `logged_values` is a dict mapping log column letters to their stringified cell value for the matched row.
     """
     matches = []
     sheet_name = sheet.name
@@ -234,22 +236,30 @@ def search_sheet_optimized(sheet, rules_by_column_pair, max_rows):
 
 def process_excel_file(filepath, sheet_rules, app=None):
     """
-    OPTIMIZED: Process Excel file with search rules
-
-    Args:
-        filepath: Path to the Excel file
-        sheet_rules: Dictionary of sheet rules
-        app: Optional xlwings App instance (for reusing across files)
-
-    sheet_rules format:
-    {
-        "sheet_name": {
-            ('A', 'B'): [
-                {'rule_name': 'Rule 1', 'search_value': 'val1', 'check_value': 'val2'},
-                {'rule_name': 'Rule 2', 'search_value': 'val3', 'check_value': 'val4'}
-            ]
-        }
-    }
+    Process an Excel file using the provided sheet rules and return all matching rows.
+    
+    Processes each sheet that has rules, optionally reusing a supplied xlwings App instance for performance, and restores Excel settings after processing. Matches include values from the search and check columns plus any configured logged columns and are also written to the 'results' logger; errors are written to the 'errors' logger.
+    
+    Parameters:
+        filepath (str): Path to the Excel workbook to process.
+        sheet_rules (dict): Mapping of sheet names to rules grouped by (search_col, check_col).
+            Format:
+            {
+                "SheetName": {
+                    ('A', 'B'): [
+                        {'rule_name': 'Rule 1', 'search_value': 'val1', 'check_value': 'val2', 'log_columns': ['C', 'D']},
+                        ...
+                    ],
+                    ...
+                },
+                ...
+            }
+        app (xlwings.App, optional): Existing xlwings App instance to reuse; if omitted, a hidden App will be created and closed by this function.
+    
+    Returns:
+        list: A list of match tuples of the form
+            (rule_name, sheet_name, first_value, second_value, logged_values)
+        where logged_values is a dict mapping log column letters to their cell values for the matched row (empty dict if none).
     """
     wb = None
     all_matches = []
@@ -379,7 +389,11 @@ def process_excel_file(filepath, sheet_rules, app=None):
                     pass
 
 def main():
-    """Main execution function"""
+    """
+    Orchestrates program execution: loads configuration, prepares logging and rules, processes Excel files, and prints a final summary.
+    
+    This function loads runtime configuration, initializes result and error logging, constructs grouped search rules from the configuration, locates Excel files in the configured directory, and iterates over those files to find matches using a shared Excel application when available (with a fallback mode if initialization fails). It prints progress and a final summary to the console and ensures Excel resources are cleaned up on exit. Exceptions encountered during initialization or per-file processing are logged to the error logger.
+    """
 
     # Load configuration
     if not load_configuration():
