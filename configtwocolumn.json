@@ -13,6 +13,7 @@
       "search_value": "1KBP0059",
       "check_column": "BK",
       "check_value": "Green",
+      "log_columns": ["A", "B"],
       "enabled": true
     }
   ],
@@ -23,6 +24,7 @@
     "search_value": "The value to find in the search_column",
     "check_column": "The column to check when search_value is found",
     "check_value": "The value to find in the check_column for a complete match",
+    "log_columns": "Optional: Array of extra column letters to log when a match is found (e.g., ['A', 'B'])",
     "enabled": "Set to false to disable a rule without deleting it",
     "columns": "Use column letters like 'A', 'B', 'Z', 'AA', etc.",
     "multiple_rules": "You can add unlimited rules. Rules with the same column pairs are processed together for speed."
